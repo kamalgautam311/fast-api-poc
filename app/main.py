@@ -50,7 +50,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(prefix="/api", router=auth.router)
+app.include_router(auth.router)
 
 
 # @app.exception_handler(Exception)
