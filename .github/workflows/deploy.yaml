@@ -5,21 +5,44 @@ on:
     branches:
       - main
 
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Deploy via ssh
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd /path/to/your/project
-            git pull origin main
-            docker compose up --build -d
+            set -euo pipefail
+
+            if [ -z "${{ secrets.DEPLOY_PATH }}" ]; then
+              echo "Missing required secret: DEPLOY_PATH"
+              exit 1
+            fi
+
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            if [ ! -d .git ]; then
+              echo "DEPLOY_PATH is not a git repo: $PWD"
+              exit 1
+            fi
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            if docker compose version >/dev/null 2>&1; then
+              docker compose up --build -d
+            elif docker-compose version >/dev/null 2>&1; then
+              docker-compose up --build -d
+            else
+              echo "Neither 'docker compose' nor 'docker-compose' found on server"
+              exit 1
+            fi
